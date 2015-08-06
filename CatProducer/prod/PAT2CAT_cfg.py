@@ -36,17 +36,18 @@ patTool(process, runOnMC, useMiniAOD)
 from CATTools.CatProducer.catTools_cff import *
 catTool(process, runOnMC, doSecVertex, useMiniAOD)
 
-from CATTools.CatProducer.catGenHFHadronMatching_cff import *
-genHFTool(process, useMiniAOD)
-
 from CATTools.CatProducer.catEventContent_cff import *
 process.out.outputCommands = catEventContent
 if runOnMC:
+    from CATTools.CatProducer.catGenHFHadronMatching_cff import *
+    genHFTool(process, useMiniAOD)
+    process.load("TopQuarkAnalysis.TopEventProducers.producers.pseudoTop_cfi")
     process.out.outputCommands.extend(catEventContentMC)
     if not useMiniAOD:
         process.out.outputCommands.extend(catEventContentAODMC)
 if doSecVertex:
     process.out.outputCommands.extend(catEventContentSecVertexs)
+
 
 ####################################################################
 #### cmsRun options
