@@ -7,9 +7,14 @@
 
 #include "DataFormats/PatCandidates/interface/Muon.h"
 #include "DataFormats/PatCandidates/interface/Electron.h"
+#include "DataFormats/Candidate/interface/Candidate.h"
+#include "DataFormats/ParticleFlowCandidate/interface/PFCandidate.h"
+#include "DataFormats/ParticleFlowCandidate/interface/PFCandidateFwd.h"
+#include "DataFormats/PatCandidates/interface/PackedCandidate.h"
 
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
 #include "TTree.h"
+#include <vector>
 
 using namespace pat;
 using namespace edm;
@@ -26,11 +31,14 @@ private:
   edm::EDGetTokenT<reco::VertexCollection> vertexLabel_;
   edm::EDGetTokenT<edm::View<pat::Muon> >          muonToken_;
   edm::EDGetTokenT<edm::View<pat::Electron> >      electronToken_;
+  edm::EDGetTokenT<edm::View<pat::PackedCandidate> >  packedCandidateToken_;
   // ID decisions objects
   edm::EDGetTokenT<edm::ValueMap<bool> > eleMediumIdMapToken_;
   edm::EDGetTokenT<edm::ValueMap<bool> > eleTightIdMapToken_;
 
-  bool isGenIdMatched( edm::Handle<reco::GenParticleCollection> genParticles_, int id );
+  //double GetIsolation( const reco::Candidate::LorentzVector& pasObj, edm::Handle<edm::View<pat::PackedCandidate> > packedCandidates, const double dR);
+  std::vector<double> GetIsolation( const reco::Candidate::LorentzVector& pasObj, edm::Handle<edm::View<pat::PackedCandidate> > packedCandidates, const double dR);
+  bool isGenIdMatched( const reco::Candidate::LorentzVector& lepton, edm::Handle<reco::GenParticleCollection> genParticles_, int id );
   bool isFromWorZ( const reco::Candidate::LorentzVector& lepton, Handle<reco::GenParticleCollection> genParticles_, int id );
   bool MatchObjects( const reco::Candidate::LorentzVector& pasObj,
       const reco::Candidate::LorentzVector& proObj,
@@ -39,18 +47,36 @@ private:
   TTree *tree;
   float weight;
   float mu1_pt;
+  float mu1_eta;
   float mu1_pfRelIso;
   float mu1_chIso;
   float mu1_nhIso;
   float mu1_phIso;
+  float mu1_puChIso;
+
   float mu1_pfRelIso03;
   float mu1_chIso03;
   float mu1_nhIso03;
   float mu1_phIso03;
+  float mu1_puChIso03;
+
   float mu1_pfRelIso04;
   float mu1_chIso04;
   float mu1_nhIso04;
   float mu1_phIso04;
+  float mu1_puChIso04;
+
+  float mu1_pfRelIso03_packed;
+  float mu1_chIso03_packed;
+  float mu1_nhIso03_packed;
+  float mu1_phIso03_packed;
+  float mu1_puChIso03_packed;
+
+  float mu1_pfRelIso04_packed;
+  float mu1_chIso04_packed;
+  float mu1_nhIso04_packed;
+  float mu1_phIso04_packed;
+  float mu1_puChIso04_packed;
 
   float mu1_detRelIso;
   float mu1_trackIso;
@@ -61,18 +87,36 @@ private:
   int mu1_matchedZ;
 
   float mu2_pt;
+  float mu2_eta;
   float mu2_pfRelIso;
   float mu2_chIso;
   float mu2_nhIso;
   float mu2_phIso;
+  float mu2_puChIso;
+
   float mu2_pfRelIso03;
   float mu2_chIso03;
   float mu2_nhIso03;
   float mu2_phIso03;
+  float mu2_puChIso03;
+
   float mu2_pfRelIso04;
   float mu2_chIso04;
   float mu2_nhIso04;
   float mu2_phIso04;
+  float mu2_puChIso04;
+
+  float mu2_pfRelIso03_packed;
+  float mu2_chIso03_packed;
+  float mu2_nhIso03_packed;
+  float mu2_phIso03_packed;
+  float mu2_puChIso03_packed;
+
+  float mu2_pfRelIso04_packed;
+  float mu2_chIso04_packed;
+  float mu2_nhIso04_packed;
+  float mu2_phIso04_packed;
+  float mu2_puChIso04_packed;
 
   float mu2_detRelIso;
   float mu2_trackIso;
@@ -84,6 +128,7 @@ private:
 
 
   float el1_pt;
+  float el1_eta;
   float el1_chIso;
   float el1_nhIso;
   float el1_phIso;
@@ -105,6 +150,7 @@ IsolationAnalyzer::IsolationAnalyzer(const edm::ParameterSet& iConfig)
   vertexLabel_      = consumes<reco::VertexCollection>       (iConfig.getParameter<edm::InputTag>("vertexLabel"));
   muonToken_     = consumes<edm::View<pat::Muon> >          (iConfig.getParameter<edm::InputTag>("muonLabel"));
   electronToken_ = consumes<edm::View<pat::Electron> >      (iConfig.getParameter<edm::InputTag>("electronLabel"));
+  packedCandidateToken_ = consumes<edm::View<pat::PackedCandidate> >      (iConfig.getParameter<edm::InputTag>("packedCandiateLabel"));
   eleMediumIdMapToken_ = consumes<edm::ValueMap<bool> >     (iConfig.getParameter<edm::InputTag>("eleMediumIdMap"));
   eleTightIdMapToken_ = consumes<edm::ValueMap<bool> >      (iConfig.getParameter<edm::InputTag>("eleTightIdMap"));
 
@@ -113,18 +159,36 @@ IsolationAnalyzer::IsolationAnalyzer(const edm::ParameterSet& iConfig)
 
   tree->Branch("weight", &weight, "weight/F");
   tree->Branch("mu1_pt", &mu1_pt, "mu1_pt/F");
+  tree->Branch("mu1_eta", &mu1_eta, "mu1_eta/F");
   tree->Branch("mu1_pfRelIso", &mu1_pfRelIso, "mu1_pfRelIso/F");
   tree->Branch("mu1_chIso", &mu1_chIso, "mu1_chIso/F");
   tree->Branch("mu1_nhIso", &mu1_nhIso, "mu1_nhIso/F");
   tree->Branch("mu1_phIso", &mu1_phIso, "mu1_phIso/F");
+  tree->Branch("mu1_puChIso", &mu1_puChIso, "mu1_puChIso/F");
+
   tree->Branch("mu1_pfRelIso03", &mu1_pfRelIso03, "mu1_pfRelIso03/F");
   tree->Branch("mu1_chIso03", &mu1_chIso03, "mu1_chIso03/F");
   tree->Branch("mu1_nhIso03", &mu1_nhIso03, "mu1_nhIso03/F");
   tree->Branch("mu1_phIso03", &mu1_phIso03, "mu1_phIso03/F");
+  tree->Branch("mu1_puChIso03", &mu1_phIso03, "mu1_phIso03/F");
+
   tree->Branch("mu1_pfRelIso04", &mu1_pfRelIso04, "mu1_pfRelIso04/F");
   tree->Branch("mu1_chIso04", &mu1_chIso04, "mu1_chIso04/F");
   tree->Branch("mu1_nhIso04", &mu1_nhIso04, "mu1_nhIso04/F");
   tree->Branch("mu1_phIso04", &mu1_phIso04, "mu1_phIso04/F");
+  tree->Branch("mu1_puChIso04", &mu1_phIso04, "mu1_phIso04/F");
+ 
+  tree->Branch("mu1_pfRelIso03_packed", &mu1_pfRelIso03_packed, "mu1_pfRelIso03_packed/F");
+  tree->Branch("mu1_chIso03_packed", &mu1_chIso03_packed, "mu1_chIso03_packed/F");
+  tree->Branch("mu1_nhIso03_packed", &mu1_nhIso03_packed, "mu1_nhIso03_packed/F");
+  tree->Branch("mu1_phIso03_packed", &mu1_phIso03_packed, "mu1_phIso03_packed/F");
+  tree->Branch("mu1_puChIso03_packed", &mu1_phIso03_packed, "mu1_phIso03_packed/F");
+
+  tree->Branch("mu1_pfRelIso04_packed", &mu1_pfRelIso04_packed, "mu1_pfRelIso04_packed/F");
+  tree->Branch("mu1_chIso04_packed", &mu1_chIso04_packed, "mu1_chIso04_packed/F");
+  tree->Branch("mu1_nhIso04_packed", &mu1_nhIso04_packed, "mu1_nhIso04_packed/F");
+  tree->Branch("mu1_phIso04_packed", &mu1_phIso04_packed, "mu1_phIso04_packed/F");
+  tree->Branch("mu1_puChIso04_packed", &mu1_phIso04_packed, "mu1_phIso04_packed/F");
 
   tree->Branch("mu1_detRelIso", &mu1_detRelIso, "mu1_detRelIso/F");
   tree->Branch("mu1_trackIso", &mu1_trackIso, "mu1_trackIso/F");
@@ -135,18 +199,36 @@ IsolationAnalyzer::IsolationAnalyzer(const edm::ParameterSet& iConfig)
   tree->Branch("mu1_matchedZ", &mu1_matchedZ, "mu1_matchedZ/I");
 
   tree->Branch("mu2_pt", &mu2_pt, "mu2_pt/F");
+  tree->Branch("mu2_eta", &mu2_eta, "mu2_eta/F");
   tree->Branch("mu2_pfRelIso", &mu2_pfRelIso, "mu2_pfRelIso/F");
   tree->Branch("mu2_chIso", &mu2_chIso, "mu2_chIso/F");
   tree->Branch("mu2_nhIso", &mu2_nhIso, "mu2_nhIso/F");
   tree->Branch("mu2_phIso", &mu2_phIso, "mu2_phIso/F");
+  tree->Branch("mu2_puChIso", &mu2_puChIso, "mu2_puChIso/F");
+
   tree->Branch("mu2_pfRelIso03", &mu2_pfRelIso03, "mu2_pfRelIso03/F");
   tree->Branch("mu2_chIso03", &mu2_chIso03, "mu2_chIso03/F");
   tree->Branch("mu2_nhIso03", &mu2_nhIso03, "mu2_nhIso03/F");
   tree->Branch("mu2_phIso03", &mu2_phIso03, "mu2_phIso03/F");
+  tree->Branch("mu2_puChIso03", &mu2_phIso03, "mu2_phIso03/F");
+
   tree->Branch("mu2_pfRelIso04", &mu2_pfRelIso04, "mu2_pfRelIso04/F");
   tree->Branch("mu2_chIso04", &mu2_chIso04, "mu2_chIso04/F");
   tree->Branch("mu2_nhIso04", &mu2_nhIso04, "mu2_nhIso04/F");
   tree->Branch("mu2_phIso04", &mu2_phIso04, "mu2_phIso04/F");
+  tree->Branch("mu2_puChIso04", &mu2_phIso04, "mu2_phIso04/F");
+
+  tree->Branch("mu2_pfRelIso03_packed", &mu2_pfRelIso03_packed, "mu2_pfRelIso03_packed/F");
+  tree->Branch("mu2_chIso03_packed", &mu2_chIso03_packed, "mu2_chIso03_packed/F");
+  tree->Branch("mu2_nhIso03_packed", &mu2_nhIso03_packed, "mu2_nhIso03_packed/F");
+  tree->Branch("mu2_phIso03_packed", &mu2_phIso03_packed, "mu2_phIso03_packed/F");
+  tree->Branch("mu2_puChIso03_packed", &mu2_phIso03_packed, "mu2_phIso03_packed/F");
+
+  tree->Branch("mu2_pfRelIso04_packed", &mu2_pfRelIso04_packed, "mu2_pfRelIso04_packed/F");
+  tree->Branch("mu2_chIso04_packed", &mu2_chIso04_packed, "mu2_chIso04_packed/F");
+  tree->Branch("mu2_nhIso04_packed", &mu2_nhIso04_packed, "mu2_nhIso04_packed/F");
+  tree->Branch("mu2_phIso04_packed", &mu2_phIso04_packed, "mu2_phIso04_packed/F");
+  tree->Branch("mu2_puChIso04_packed", &mu2_phIso04_packed, "mu2_phIso04_packed/F");
 
   tree->Branch("mu2_detRelIso", &mu2_detRelIso, "mu2_detRelIso/F");
   tree->Branch("mu2_trackIso", &mu2_trackIso, "mu2_trackIso/F");
@@ -156,10 +238,8 @@ IsolationAnalyzer::IsolationAnalyzer(const edm::ParameterSet& iConfig)
   tree->Branch("mu2_matched", &mu2_matched, "mu2_matched/I");
   tree->Branch("mu2_matchedZ", &mu2_matchedZ, "mu2_matchedZ/I");
 
-  
-
-
   tree->Branch("el1_pt", &el1_pt, "el1_pt/F");
+  tree->Branch("el1_eta", &el1_eta, "el1_eta/F");
   tree->Branch("el1_pfRelIso", &el1_pfRelIso, "el1_pfRelIso/F");
   tree->Branch("el1_chIso", &el1_chIso, "el1_chIso/F");
   tree->Branch("el1_nhIso", &el1_nhIso, "el1_nhIso/F");
@@ -188,18 +268,36 @@ void IsolationAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup&
   weight = 1.0;
 
   mu1_pt = -1.0;
+  mu1_eta = -9.0;
   mu1_pfRelIso = -1.0;
   mu1_chIso = -1.0;
   mu1_nhIso = -1.0;
   mu1_phIso = -1.0;
+  mu1_puChIso = -1.0;
+
   mu1_pfRelIso03 = -1.0;
   mu1_chIso03 = -1.0;
   mu1_nhIso03 = -1.0;
   mu1_phIso03 = -1.0;
+  mu1_puChIso03 = -1.0;
+
   mu1_pfRelIso04 = -1.0;
   mu1_chIso04 = -1.0;
   mu1_nhIso04 = -1.0;
   mu1_phIso04 = -1.0;
+  mu1_puChIso04 = -1.0;
+
+  mu1_pfRelIso03_packed = -1.0;
+  mu1_chIso03_packed = -1.0;
+  mu1_nhIso03_packed = -1.0;
+  mu1_phIso03_packed = -1.0;
+  mu1_puChIso03_packed = -1.0;
+
+  mu1_pfRelIso04_packed = -1.0;
+  mu1_chIso04_packed = -1.0;
+  mu1_nhIso04_packed = -1.0;
+  mu1_phIso04_packed = -1.0;
+  mu1_puChIso04_packed = -1.0;
 
   mu1_detRelIso = -1.0;
   mu1_trackIso = -1.0;
@@ -210,18 +308,36 @@ void IsolationAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup&
   mu1_matchedZ = -1.0;
 
   mu2_pt = -1.0;
+  mu2_eta = -9.0;
   mu2_pfRelIso = -1.0;
   mu2_chIso = -1.0;
   mu2_nhIso = -1.0;
   mu2_phIso = -1.0;
+  mu2_puChIso = -1.0;
+
   mu2_pfRelIso03 = -1.0;
   mu2_chIso03 = -1.0;
   mu2_nhIso03 = -1.0;
   mu2_phIso03 = -1.0;
+  mu2_puChIso03 = -1.0;
+
   mu2_pfRelIso04 = -1.0;
   mu2_chIso04 = -1.0;
   mu2_nhIso04 = -1.0;
   mu2_phIso04 = -1.0;
+  mu2_puChIso04 = -1.0;
+
+  mu2_pfRelIso03_packed = -1.0;
+  mu2_chIso03_packed = -1.0;
+  mu2_nhIso03_packed = -1.0;
+  mu2_phIso03_packed = -1.0;
+  mu2_puChIso03_packed = -1.0;
+
+  mu2_pfRelIso04_packed = -1.0;
+  mu2_chIso04_packed = -1.0;
+  mu2_nhIso04_packed = -1.0;
+  mu2_phIso04_packed = -1.0;
+  mu2_puChIso04_packed = -1.0;
 
   mu2_detRelIso = -1.0;
   mu2_trackIso = -1.0;
@@ -232,6 +348,7 @@ void IsolationAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup&
   mu2_matchedZ = -1.0;
 
   el1_pt = -1.0;
+  el1_eta = -1.0;
   el1_pfRelIso = -1.0;
   el1_chIso = -1.0;
   el1_nhIso = -1.0;
@@ -257,6 +374,9 @@ void IsolationAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup&
   Handle<edm::View<pat::Electron> > electrons;
   iEvent.getByToken(electronToken_, electrons);
 
+  Handle<edm::View<pat::PackedCandidate> > packedCandidates;
+  iEvent.getByToken(packedCandidateToken_, packedCandidates);
+
    // Get the electron ID data from the event stream.
   // Note: this implies that the VID ID modules have been run upstream.
   // If you need more info, check with the EGM group.
@@ -277,6 +397,7 @@ void IsolationAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup&
     if( id == false ) continue;
 
     el1_pt = electron.pt();
+    el1_eta = electron.eta();
     el1_chIso = electron.chargedHadronIso();
     el1_nhIso = electron.neutralHadronIso();
     el1_phIso = electron.photonIso();
@@ -285,7 +406,7 @@ void IsolationAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup&
     el1_ecalIso = electron.ecalIso();
     el1_hcalIso = electron.hcalIso();
     el1_detRelIso = ( el1_trackIso + el1_ecalIso + el1_hcalIso ) / el1_pt;
-    el1_matched = isGenIdMatched( genParticles, 11);
+    el1_matched = isGenIdMatched( electron.p4(), genParticles, 11);
     el1_matchedZ = isFromWorZ( electron.p4(), genParticles, 11);
     el1_mediumID = isPassMedium;
     el1_tightID = isPassTight;
@@ -303,9 +424,11 @@ void IsolationAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup&
     if( id == false ) continue;
     if( idx == 0){
       mu1_pt = muon.pt();
+      mu1_eta= muon.eta();
       mu1_chIso = muon.chargedHadronIso();
       mu1_nhIso = muon.neutralHadronIso();
       mu1_phIso = muon.photonIso();
+      mu1_puChIso = muon.puChargedHadronIso();
       mu1_pfRelIso = ( mu1_chIso + mu1_nhIso + mu1_phIso ) / mu1_pt ;
 
       mu1_chIso04 = muon.pfIsolationR04().sumChargedHadronPt;
@@ -318,19 +441,39 @@ void IsolationAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup&
       mu1_pfRelIso03 = ( mu1_chIso03 + mu1_nhIso03 + mu1_phIso03 ) / mu1_pt ;
       mu1_pfRelIso04 = ( mu1_chIso04 + mu1_nhIso04 + mu1_phIso04 ) / mu1_pt ;
 
+      std::vector<double> Iso03_packedCandidate = GetIsolation( muon.p4(), packedCandidates, 0.3);
+      std::vector<double> Iso04_packedCandidate = GetIsolation( muon.p4(), packedCandidates, 0.4);
+
+      mu1_chIso03_packed = Iso03_packedCandidate[0];
+      mu1_chIso04_packed = Iso04_packedCandidate[0];
+ 
+      mu1_nhIso03_packed = Iso03_packedCandidate[1];
+      mu1_nhIso04_packed = Iso04_packedCandidate[1];
+
+      mu1_phIso03_packed = Iso03_packedCandidate[2];
+      mu1_phIso04_packed = Iso04_packedCandidate[2];
+
+      mu1_pfRelIso03_packed =  ( Iso03_packedCandidate[0] + Iso03_packedCandidate[1] + Iso03_packedCandidate[2]) / mu1_pt ;
+      mu1_pfRelIso04_packed =  ( Iso04_packedCandidate[0] + Iso04_packedCandidate[1] + Iso04_packedCandidate[2]) / mu1_pt ;
+
+      //std::cout << "packed   isolation 0.3 = " << Iso03_packedCandidate[0] << " " << Iso03_packedCandidate[1] << " " << Iso03_packedCandidate[2]  << std::endl;
+      //std::cout << "function isolation 0.3 = " << mu1_chIso03 << " " << mu1_nhIso03 << " " << mu1_phIso03  << std::endl;
+
       mu1_trackIso = muon.trackIso();
       mu1_ecalIso = muon.ecalIso();
       mu1_hcalIso = muon.hcalIso();
       mu1_detRelIso = ( mu1_trackIso + mu1_ecalIso + mu1_hcalIso ) / mu1_pt;
       mu1_tightID = tightid;
-      mu1_matched = isGenIdMatched( genParticles, 13);
+      mu1_matched = isGenIdMatched( muon.p4(), genParticles, 13);
       mu1_matchedZ = isFromWorZ( muon.p4(), genParticles, 13);
     }
     if( idx == 1){
       mu2_pt = muon.pt();
+      mu2_eta = muon.eta();
       mu2_chIso = muon.chargedHadronIso();
       mu2_nhIso = muon.neutralHadronIso();
       mu2_phIso = muon.photonIso();
+      mu2_puChIso = muon.puChargedHadronIso();      
       mu2_pfRelIso = ( mu2_chIso + mu2_nhIso + mu2_phIso ) / mu2_pt ;
 
       mu2_chIso04 = muon.pfIsolationR04().sumChargedHadronPt;
@@ -343,12 +486,27 @@ void IsolationAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup&
       mu2_pfRelIso03 = ( mu2_chIso03 + mu2_nhIso03 + mu2_phIso03 ) / mu2_pt ;
       mu2_pfRelIso04 = ( mu2_chIso04 + mu2_nhIso04 + mu2_phIso04 ) / mu2_pt ;
 
+      std::vector<double> Iso03_packedCandidate = GetIsolation( muon.p4(), packedCandidates, 0.3);
+      std::vector<double> Iso04_packedCandidate = GetIsolation( muon.p4(), packedCandidates, 0.4);
+
+      mu2_chIso03_packed = Iso03_packedCandidate[0];
+      mu2_chIso04_packed = Iso04_packedCandidate[0];
+ 
+      mu2_nhIso03_packed = Iso03_packedCandidate[1];
+      mu2_nhIso04_packed = Iso04_packedCandidate[1];
+
+      mu2_phIso03_packed = Iso03_packedCandidate[2];
+      mu2_phIso04_packed = Iso04_packedCandidate[2];
+
+      mu2_pfRelIso03_packed =  ( Iso03_packedCandidate[0] + Iso03_packedCandidate[1] + Iso03_packedCandidate[2]) / mu2_pt ;
+      mu2_pfRelIso04_packed =  ( Iso04_packedCandidate[0] + Iso04_packedCandidate[1] + Iso04_packedCandidate[2]) / mu2_pt ;
+
       mu2_trackIso = muon.trackIso();
       mu2_ecalIso = muon.ecalIso();
       mu2_hcalIso = muon.hcalIso();
       mu2_detRelIso = ( mu2_trackIso + mu2_ecalIso + mu2_hcalIso ) / mu2_pt;
       mu2_tightID = tightid;
-      mu2_matched = isGenIdMatched( genParticles, 13);
+      mu2_matched = isGenIdMatched( muon.p4(), genParticles, 13);
       mu2_matchedZ = isFromWorZ( muon.p4(), genParticles, 13);
     }
     idx++;
@@ -358,13 +516,59 @@ void IsolationAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup&
   tree->Fill();
 }
 
-bool IsolationAnalyzer::isGenIdMatched( edm::Handle<reco::GenParticleCollection> genParticles_, int id ){
+std::vector<double> IsolationAnalyzer::GetIsolation( const reco::Candidate::LorentzVector& pasObj, edm::Handle<edm::View<pat::PackedCandidate> > packedCandidates, const double dR ){
+
+  double chIso = 0;
+  double nhIso = 0;
+  double phIso = 0;
+
+  for( edm::View<pat::PackedCandidate>::const_iterator mcIter=packedCandidates->begin(); mcIter != packedCandidates->end(); mcIter++){
+    
+    double proEta = mcIter->eta();
+    double proPhi = mcIter->phi();
+    double proPt  = mcIter->pt();
+    double pasEta = pasObj.eta();
+    double pasPhi = pasObj.phi();
+    //double pasPt  = pasObj.pt();
+
+    double dRval = deltaR(proEta, proPhi, pasEta, pasPhi);
+
+    if( mcIter->pdgId() == 211 && dRval < dR){
+      chIso = chIso + proPt;
+    } 
+
+    if( mcIter->pdgId() == 130 && dRval < dR){
+      nhIso = chIso + proPt;
+    }
+
+    if( mcIter->pdgId() == 22 && dRval < dR){
+      phIso = chIso + proPt;
+    }
+
+  }
+
+  std::vector<double>  output;
+  output.push_back(chIso);
+  output.push_back(nhIso);
+  output.push_back(phIso);
+  //double absIso = chIso + nhIso + phIso;
+  //double relIso = absIso / pasObj.pt();
+  //return relIso;
+  return output;
+
+}
+
+bool IsolationAnalyzer::isGenIdMatched( const reco::Candidate::LorentzVector& lepton, edm::Handle<reco::GenParticleCollection> genParticles_, int id ){
 
   bool out = false;
 
   for ( reco::GenParticleCollection::const_iterator mcIter=genParticles_->begin(); mcIter != genParticles_->end(); mcIter++ ) {
     int genId = mcIter->pdgId();
     if( abs(genId) != (int) id ) continue;
+      
+    bool match = MatchObjects(lepton, mcIter->p4(), false); 
+    if( match != true) continue;
+
     out = true;
   }
 

@@ -47,6 +47,7 @@ process.IsoAna = cms.EDAnalyzer('IsolationAnalyzer',
                                            vertexLabel   = cms.InputTag("offlineSlimmedPrimaryVertices"),
                                            muonLabel     = cms.InputTag("slimmedMuons"),
                                            electronLabel = cms.InputTag("slimmedElectrons"),
+                                           packedCandiateLabel = cms.InputTag("packedPFCandidates"),
                                            # ID decisions (common to all formats)
                                            eleMediumIdMap = cms.InputTag("egmGsfElectronIDs:mvaEleID-Spring15-25ns-nonTrig-V1-wp90"),
                                            eleTightIdMap = cms.InputTag("egmGsfElectronIDs:mvaEleID-Spring15-25ns-nonTrig-V1-wp80"),
