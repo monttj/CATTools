@@ -533,15 +533,15 @@ std::vector<double> IsolationAnalyzer::GetIsolation( const reco::Candidate::Lore
 
     double dRval = deltaR(proEta, proPhi, pasEta, pasPhi);
 
-    if( mcIter->pdgId() == 211 && dRval < dR){
+    if( abs(mcIter->pdgId()) == 211 && dRval < dR){
       chIso = chIso + proPt;
     } 
 
-    if( mcIter->pdgId() == 130 && dRval < dR){
+    if( abs(mcIter->pdgId()) == 130 && dRval < dR){
       nhIso = chIso + proPt;
     }
 
-    if( mcIter->pdgId() == 22 && dRval < dR){
+    if( abs(mcIter->pdgId()) == 22 && dRval < dR){
       phIso = chIso + proPt;
     }
 
